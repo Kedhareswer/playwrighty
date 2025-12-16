@@ -1,123 +1,40 @@
-# 🏗️ Architecture
+# Architecture
 
-## High-Level Overview
+## High-level flow
 
-Web Audit is a modular Python application with Flask API, CLI, and Playwright browser automation.
+1. User provides a start URL via the interactive CLI.
+2. Discovery phase:
+   - Fetch `robots.txt`
+   - Collect sitemap candidates (robots hints + `/sitemap.xml`)
+3. Crawl phase:
+   - Queue URLs (same-origin only)
+   - Filter by robots policy
+   - Visit pages via a runner backend
+   - Extract data + optional screenshots
+4. Reporting phase:
+   - Write `report.json`
+   - Write a professional `report.md`
 
-## System Diagram
+## Key modules
 
-```mermaid
-graph TB
-    subgraph Interfaces
-        UI[Web UI]
-        CLI[CLI]
-    end
+- `bin/cli.js`: CLI entry
+- `src/cli/run.js`: interactive prompts + progress UI
+- `src/crawler/*`: robots/sitemap discovery + crawl orchestration
+- `src/runners/*`: runner backends
+  - `playwrightBackend`: normal Playwright (default)
+  - `mcpBackend`: placeholder for MCP transport wiring (next step)
+- `src/report/*`: report generation
 
-    subgraph API
-        Flask[Flask API]
-    end
+## MCP mode (planned)
 
-    subgraph Core
-        WebAudit[WebAudit]
-        SiteAudit[SiteAudit]
-        Driver[Playwright Driver]
-    end
+MCP mode is designed to call Playwright/Puppeteer tools through an MCP server.
 
-    subgraph Extractors
-        Meta[meta]
-        OG[opengraph]
-        Links[links]
-        Headings[headings]
-        JSONLD[jsonld]
-        Text[text]
-    end
+To complete it, we need a concrete decision on transport:
 
-    subgraph Utilities
-        Robots[robots]
-        Sitemap[sitemap]
-        Report[report]
-    end
+- stdio MCP server command (recommended for local)
+- HTTP MCP server URL (recommended for remote)
 
-    UI --> Flask
-    CLI --> WebAudit
-    CLI --> SiteAudit
-    Flask --> WebAudit
-    Flask --> SiteAudit
-    WebAudit --> Driver
-    SiteAudit --> Driver
-    WebAudit --> Meta
-    WebAudit --> OG
-    WebAudit --> Links
-    WebAudit --> Headings
-    WebAudit --> JSONLD
-    WebAudit --> Text
-    WebAudit --> Robots
-    SiteAudit --> Robots
-    SiteAudit --> Sitemap
-    WebAudit --> Report
-    SiteAudit --> Report
-```
+Once decided, the `mcpBackend` will be updated to:
 
-## Component Table
-
-| Layer | Component | File | Responsibility |
-|-------|-----------|------|----------------|
-| UI | HTML/CSS/JS | `templates/index.html` | Browser interface |
-| CLI | Click + Rich | `cli.py` | Command-line wizard |
-| API | Flask | `app.py` | HTTP endpoints |
-| Core | WebAudit | `web_audit/audit.py` | Single-page orchestration |
-| Core | SiteAudit | `web_audit/site_audit.py` | Multi-page crawl |
-| Core | Driver | `web_audit/driver.py` | Playwright wrapper |
-| Extract | Meta | `web_audit/extract/meta.py` | Meta tags |
-| Extract | OpenGraph | `web_audit/extract/opengraph.py` | OG + Twitter |
-| Extract | Links | `web_audit/extract/links.py` | Link parsing |
-| Extract | Headings | `web_audit/extract/headings.py` | H1-H6 |
-| Extract | JSON-LD | `web_audit/extract/jsonld.py` | Structured data |
-| Extract | Text | `web_audit/extract/text.py` | Text preview |
-| Util | Robots | `web_audit/robots.py` | robots.txt parser |
-| Util | Sitemap | `web_audit/sitemap.py` | Sitemap parser |
-| Util | Report | `web_audit/report.py` | JSON + MD generation |
-
-## Data Flow (Single Page)
-
-```mermaid
-flowchart LR
-    A[URL] --> B[WebAudit]
-    B --> C[Robots]
-    C --> D{Allowed?}
-    D -->|Yes| E[Playwright]
-    D -->|No| F[Skip]
-    E --> G[Extractors]
-    G --> H[Report]
-```
-
-## Data Flow (Site Audit)
-
-```mermaid
-flowchart TD
-    A[URL] --> B[SiteAudit]
-    B --> C[Robots]
-    C --> D[Sitemap]
-    D --> E[URL List]
-    E --> F[Loop: WebAudit per URL]
-    F --> G[Summary]
-    G --> H[Report]
-```
-
-## Event System
-
-WebAudit and SiteAudit emit events for observability:
-
-| Event | When Fired | Payload |
-|-------|------------|---------|
-| `pipeline:start` | Audit starts | `{ url, config }` |
-| `robots:fetch` | Before robots.txt | `{ url }` |
-| `robots:result` | After robots.txt | `{ allowed, crawl_delay, sitemaps }` |
-| `navigate:start` | Before page load | `{ url, driver }` |
-| `navigate:complete` | After page load | `{ final_url, status, load_time_ms }` |
-| `extract:start` | Before extraction | `{ extractors }` |
-| `extract:complete` | After extraction | `{ extracted }` |
-| `report:generated` | Report saved | `{ path, format }` |
-| `pipeline:end` | Audit complete | `{ summary }` |
-| `error` | Any error | `{ message }` |
-| `*` | Wildcard for all events | Full event object |
+- connect using `@modelcontextprotocol/sdk`
+- call the relevant tool methods to navigate, extract, and screenshot
