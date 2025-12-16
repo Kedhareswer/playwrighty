@@ -13,7 +13,11 @@ from web_audit import WebAudit, SiteAudit, __version__
 app = Flask(__name__)
 
 # Configuration
-app.config["REPORTS_DIR"] = os.environ.get("REPORTS_DIR", "./reports")
+_is_vercel = os.environ.get("VERCEL") == "1" or bool(os.environ.get("VERCEL"))
+app.config["REPORTS_DIR"] = os.environ.get(
+    "REPORTS_DIR",
+    "/tmp/reports" if _is_vercel else "./reports",
+)
 
 
 @app.route("/")
@@ -60,6 +64,7 @@ def audit():
         "url": "https://example.com",
         "save_screenshot": false,
         "save_html": false,
+        "save_robots": false,
         "respect_robots": true
     }
     """
@@ -83,7 +88,7 @@ def audit():
         report = audit_instance.visit(url)
         return jsonify(report)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"{type(e).__name__}: {str(e)}"}), 500
 
 
 @app.route("/site-audit", methods=["POST"])
@@ -120,7 +125,7 @@ def site_audit():
         report = audit_instance.audit(url)
         return jsonify(report)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"{type(e).__name__}: {str(e)}"}), 500
 
 
 @app.route("/reports")
