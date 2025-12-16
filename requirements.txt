@@ -1,0 +1,26 @@
+# Flask Web Framework
+flask>=3.0.0
+
+# Playwright for browser automation
+playwright>=1.40.0
+
+# HTTP requests
+requests>=2.31.0
+
+# Robots.txt parsing
+robotexclusionrulesparser>=1.7.1
+
+# CLI
+click>=8.1.7
+
+# Rich console output
+rich>=13.7.0
+
+# XML parsing for sitemaps
+lxml>=5.1.0
+
+# HTML parsing
+beautifulsoup4>=4.12.0
+
+# Development
+python-dotenv>=1.0.0
