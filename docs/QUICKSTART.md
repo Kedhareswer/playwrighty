@@ -2,7 +2,7 @@
 
 ## What this does
 
-Playwrighty crawls a website starting from a URL, **respects robots.txt**, optionally reads `sitemap.xml`, visits discovered pages, takes screenshots, extracts publicly visible information, and produces a **professional report** (Markdown + JSON).
+Playwrighty is an **agentic web scraper** powered by LangGraph and Gemini. It crawls websites, extracts LLM-friendly content, and provides a **RAG chat interface** to ask questions about the scraped data.
 
 ## Install
 
@@ -10,34 +10,81 @@ Playwrighty crawls a website starting from a URL, **respects robots.txt**, optio
 npm install
 ```
 
-## Run (interactive)
+## Setup Gemini API Key
+
+For agentic mode and RAG chat, you need a Google API key:
+
+```bash
+# Windows PowerShell
+$env:GOOGLE_API_KEY="your_api_key_here"
+
+# Linux/Mac
+export GOOGLE_API_KEY=your_api_key_here
+```
+
+Get your key at: https://makersuite.google.com/app/apikey
+
+## Run Modes
+
+### 1. Crawl Mode (default)
 
 ```bash
 npm start
 ```
 
-Or:
+Interactive prompts will guide you through:
+- Website URL
+- Crawl scope (single URL or full-site)
+- Concurrency (parallel pages)
+- Screenshots (yes/no)
+- **Headed mode** — visible browser for CAPTCHA/Cloudflare
+- **LangGraph agent** — AI-powered crawl decisions
+
+### 2. RAG Chat Mode
 
 ```bash
-npx playwrighty
+npm run chat
 ```
+
+Ask questions about previously scraped content. Select a crawl run and start chatting!
 
 ## Output
 
-A new folder is created in:
-
 ```
 ./outputs/<timestamp>_<hostname>/
+├── report.md        # Human-readable report
+├── report.json      # Machine-readable (used by RAG chat)
+└── screenshots/     # Optional page screenshots
 ```
 
-Containing:
+## Key Options
 
-- `report.md`
-- `report.json`
-- `screenshots/` (if enabled)
+| Option | Description |
+|--------|-------------|
+| **Crawl scope** | Provided URLs only or full-site discovery |
+| **Concurrency** | 1-10 parallel pages |
+| **Headed mode** | Opens visible browser for manual CAPTCHA solving |
+| **LangGraph agent** | Uses Gemini for adaptive crawl decisions |
+
+## Bot Detection / CAPTCHA
+
+If a site shows CAPTCHA or Cloudflare challenge:
+
+1. Select **"Run in headed mode"** when prompted
+2. A browser window will open
+3. Solve the challenge manually
+4. Press Enter in the terminal to continue
+
+## LLM-Friendly Extraction
+
+Content is extracted in formats optimized for LLM consumption:
+- Chunked text with overlap for embeddings
+- Structured metadata (URL, title, headings)
+- Markdown reconstruction of main content
+- Tables converted to Markdown format
 
 ## Notes
 
-- The crawler is **same-origin only** (it won’t follow external domains).
-- `robots.txt` is used to decide what URLs may be fetched.
-- This is intended for **discovery and internal analysis**, not SEO.
+- **Same-origin only** — won't follow external domains
+- **Respects robots.txt** — ethical crawling
+- **Atomic outputs** — failed runs don't leave empty folders

@@ -1,6 +1,6 @@
 {
   "name": "playwrighty",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "commonjs",
   "bin": {
@@ -8,16 +8,21 @@
   },
   "scripts": {
     "start": "node bin/cli.js",
+    "chat": "node bin/cli.js chat",
     "lint": "node -c bin/cli.js && node -c src/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.13.0",
+    "@langchain/core": "^0.3.0",
+    "@langchain/google-genai": "^0.1.0",
+    "@langchain/langgraph": "^0.2.0",
     "chalk": "^4.1.2",
+    "dotenv": "^16.4.5",
     "inquirer": "^8.2.6",
     "ora": "^6.3.1",
     "p-limit": "^3.1.0",
     "playwright": "^1.49.1",
     "robots-parser": "^3.0.1",
-    "sitemapper": "^3.2.4"
+    "sitemapper": "^3.2.4",
+    "uuid": "^9.0.0"
   }
 }

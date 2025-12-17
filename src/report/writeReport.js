@@ -82,7 +82,46 @@ function buildMarkdown(report) {
     if (p.screenshotPath) lines.push(`- **Screenshot:** ${p.screenshotPath}`);
     lines.push('');
 
-    if (p.fullText) {
+    if (p.structured) {
+      lines.push('**Structured extraction:**');
+      lines.push('');
+
+      if (Array.isArray(p.structured.headings) && p.structured.headings.length) {
+        lines.push('- **Headings:**');
+        for (const h of p.structured.headings.slice(0, 30)) {
+          lines.push(`  - ${h.level}: ${h.text}`);
+        }
+      }
+
+      if (Array.isArray(p.structured.links) && p.structured.links.length) {
+        lines.push(`- **Links:** ${p.structured.links.length}`);
+        for (const l of p.structured.links.slice(0, 20)) {
+          const t = (l.text || '').trim();
+          lines.push(`  - ${t ? t + ' — ' : ''}${l.href}`);
+        }
+      }
+
+      if (Array.isArray(p.structured.images) && p.structured.images.length) {
+        lines.push(`- **Images:** ${p.structured.images.length}`);
+        for (const img of p.structured.images.slice(0, 20)) {
+          const a = (img.alt || '').trim();
+          lines.push(`  - ${a ? a + ' — ' : ''}${img.src}`);
+        }
+      }
+
+      if (Array.isArray(p.structured.paragraphs) && p.structured.paragraphs.length) {
+        lines.push(`- **Paragraphs:** ${p.structured.paragraphs.length}`);
+      }
+
+      lines.push('');
+    }
+
+    if (p.contentMarkdown) {
+      lines.push('**Extracted content (structured):**');
+      lines.push('');
+      lines.push(String(p.contentMarkdown));
+      lines.push('');
+    } else if (p.fullText) {
       lines.push('**Extracted text (full):**');
       lines.push('');
       lines.push('```');

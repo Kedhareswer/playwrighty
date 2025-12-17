@@ -6,7 +6,6 @@ const pLimit = pLimitPkg?.default || pLimitPkg;
 const { discoverSitemapUrls, getRobotsPolicy } = require('./discovery');
 const { sameOrigin, normalizeUrl } = require('../core/url');
 const { createPlaywrightBackend } = require('../runners/playwrightBackend');
-const { createMcpBackend } = require('../runners/mcpBackend');
 const { writeReport } = require('../report/writeReport');
 const { safeFilename, nowStamp } = require('../report/util');
 
@@ -19,7 +18,16 @@ function isHttpUrl(u) {
   }
 }
 
-async function crawlSite({ startUrl, scope, targetUrls, engine, mcpUrl, maxPages, screenshots, onProgress }) {
+async function crawlSite({
+  startUrl,
+  scope,
+  targetUrls,
+  maxPages,
+  concurrency,
+  screenshots,
+  headed,
+  onProgress,
+}) {
   const startedAt = new Date();
   const root = new URL(startUrl);
 
@@ -41,10 +49,7 @@ async function crawlSite({ startUrl, scope, targetUrls, engine, mcpUrl, maxPages
   const robots = await getRobotsPolicy(startUrl);
   const sitemapUrls = scope === 'site' ? await discoverSitemapUrls(startUrl, robots) : [];
 
-  const backend =
-    engine === 'mcp'
-      ? await createMcpBackend({ mcpUrl })
-      : await createPlaywrightBackend();
+  const backend = await createPlaywrightBackend({ headed });
 
   const pages = new Map();
   const canonicalByRequested = new Map();
@@ -86,7 +91,8 @@ async function crawlSite({ startUrl, scope, targetUrls, engine, mcpUrl, maxPages
     progress('Sitemap', 'Skipped (provided URLs only)');
   }
 
-  const limit = pLimit(3);
+  const workerCount = Math.max(1, Math.min(10, Number(concurrency) || 3));
+  const limit = pLimit(workerCount);
 
   progress('Crawl', `Analyzing up to ${maxPages} pages…`);
 
@@ -104,6 +110,7 @@ async function crawlSite({ startUrl, scope, targetUrls, engine, mcpUrl, maxPages
         url,
         takeScreenshot: Boolean(screenshotsDir),
         screenshotsDir,
+        headed,
       });
 
       const canonicalUrl = normalizeUrl(pageResult.finalUrl || url);
@@ -124,6 +131,8 @@ async function crawlSite({ startUrl, scope, targetUrls, engine, mcpUrl, maxPages
         metaDescription: pageResult.metaDescription,
         h1: pageResult.h1,
         fullText: pageResult.fullText,
+        contentMarkdown: pageResult.contentMarkdown,
+        structured: pageResult.structured,
         links: pageResult.links,
         images: pageResult.images,
         screenshotPath: pageResult.screenshotPath,
@@ -140,7 +149,7 @@ async function crawlSite({ startUrl, scope, targetUrls, engine, mcpUrl, maxPages
 
   let success = false;
   try {
-    await Promise.all([limit(worker), limit(worker), limit(worker)]);
+    await Promise.all(Array.from({ length: workerCount }, () => limit(worker)));
 
     progress('Report', 'Writing report…');
 
@@ -150,7 +159,6 @@ async function crawlSite({ startUrl, scope, targetUrls, engine, mcpUrl, maxPages
       startUrl,
       origin: root.origin,
       maxPages,
-      engine,
       robots: {
         url: robots.robotsUrl,
         hasRobotsTxt: robots.hasRobotsTxt,

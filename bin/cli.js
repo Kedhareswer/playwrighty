@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+require('dotenv').config();
+
 const { runCli } = require('../src/cli/run');
 
 runCli().catch((err) => {

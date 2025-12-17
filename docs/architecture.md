@@ -1,40 +1,96 @@
 # Architecture
 
-## High-level flow
+## System Overview
 
-1. User provides a start URL via the interactive CLI.
-2. Discovery phase:
-   - Fetch `robots.txt`
-   - Collect sitemap candidates (robots hints + `/sitemap.xml`)
-3. Crawl phase:
-   - Queue URLs (same-origin only)
-   - Filter by robots policy
-   - Visit pages via a runner backend
-   - Extract data + optional screenshots
-4. Reporting phase:
-   - Write `report.json`
-   - Write a professional `report.md`
+Playwrighty is an agentic web scraper built with:
+- **LangGraph** — State machine for adaptive crawl decisions
+- **Gemini** — LLM for content analysis and RAG chat
+- **Playwright** — Browser automation with bot detection handling
+- **Vector Store** — In-memory embeddings for semantic search
 
-## Key modules
+## High-level Flow
 
-- `bin/cli.js`: CLI entry
-- `src/cli/run.js`: interactive prompts + progress UI
-- `src/crawler/*`: robots/sitemap discovery + crawl orchestration
-- `src/runners/*`: runner backends
-  - `playwrightBackend`: normal Playwright (default)
-  - `mcpBackend`: placeholder for MCP transport wiring (next step)
-- `src/report/*`: report generation
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   CLI       │ ──▶ │  LangGraph  │ ──▶ │  Playwright │
+│  (prompts)  │     │   Agent     │     │   Backend   │
+└─────────────┘     └─────────────┘     └─────────────┘
+                           │                    │
+                           ▼                    ▼
+                    ┌─────────────┐     ┌─────────────┐
+                    │   Gemini    │     │  Extraction │
+                    │   (LLM)     │     │  + Reports  │
+                    └─────────────┘     └─────────────┘
+                                               │
+                                               ▼
+                                        ┌─────────────┐
+                                        │  RAG Chat   │
+                                        │  (Vector)   │
+                                        └─────────────┘
+```
 
-## MCP mode (planned)
+## Key Modules
 
-MCP mode is designed to call Playwright/Puppeteer tools through an MCP server.
+### Core
+- `bin/cli.js` — Entry point
+- `src/cli/run.js` — Interactive CLI with crawl + chat modes
+- `src/index.js` — Public API exports
 
-To complete it, we need a concrete decision on transport:
+### Crawler
+- `src/crawler/crawlSite.js` — Standard crawl orchestration
+- `src/crawler/discovery.js` — robots.txt + sitemap discovery
+- `src/core/url.js` — URL utilities
 
-- stdio MCP server command (recommended for local)
-- HTTP MCP server URL (recommended for remote)
+### Agent (LangGraph)
+- `src/agent/state.js` — Agent state schema (Annotation)
+- `src/agent/nodes.js` — Graph nodes (init, discovery, crawl, analyze, human)
+- `src/agent/graph.js` — LangGraph compilation + runner
 
-Once decided, the `mcpBackend` will be updated to:
+### LLM
+- `src/llm/gemini.js` — Gemini chat + embeddings wrapper
 
-- connect using `@modelcontextprotocol/sdk`
-- call the relevant tool methods to navigate, extract, and screenshot
+### Extraction
+- `src/runners/playwrightBackend.js` — Playwright browser + extraction
+- `src/extraction/llmFriendly.js` — Chunking for RAG embeddings
+
+### RAG
+- `src/rag/vectorStore.js` — In-memory vector store
+- `src/rag/chat.js` — RAG chat interface
+
+### Reports
+- `src/report/writeReport.js` — Markdown + JSON generation
+- `src/report/util.js` — Timestamps, safe filenames
+
+## Agent State Machine
+
+```
+START ──▶ init ──▶ discovery ──▶ crawl ──┬──▶ analyze ──▶ END
+                                   │     │
+                                   │     └──▶ human ──┐
+                                   │                  │
+                                   └──────────────────┘
+```
+
+### Nodes
+| Node | Purpose |
+|------|---------|
+| `init` | Initialize queue from provided URLs |
+| `discovery` | Fetch robots.txt, parse sitemaps |
+| `crawl` | Visit URL, extract content, handle errors |
+| `analyze` | LLM analysis of extracted content |
+| `human` | Pause for manual CAPTCHA intervention |
+
+## Bot Detection Handling
+
+When Cloudflare/CAPTCHA is detected:
+1. Check page content for challenge patterns
+2. If headed mode: pause and prompt user
+3. User solves challenge in browser
+4. Continue crawling with established session
+
+## LLM-Friendly Extraction
+
+Content is processed for optimal RAG performance:
+- **Chunking**: 1500 chars with 200 char overlap
+- **Metadata**: URL, title, chunk index, word count
+- **Format**: Title + URL header + content body
