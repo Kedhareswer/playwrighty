@@ -22,9 +22,14 @@ npm run chat     # RAG chat on scraped content
 
 ## Environment Variables
 
+Create a `.env` file in the project root:
+
 ```bash
-# Required for LangGraph agent and RAG chat
-export GOOGLE_API_KEY=your_gemini_api_key
+GOOGLE_API_KEY=your_gemini_api_key
+
+# Optional: override models
+GEMINI_MODEL=gemini-1.5-flash
+GEMINI_EMBEDDING_MODEL=text-embedding-004
 ```
 
 Get your API key at: https://makersuite.google.com/app/apikey
@@ -44,6 +49,12 @@ Get your API key at: https://makersuite.google.com/app/apikey
 | **Screenshots** | Capture full-page screenshots |
 | **Headed mode** | Visible browser for CAPTCHA solving |
 | **LangGraph agent** | AI-powered crawl decisions (requires API key) |
+
+## RAG Chat
+
+`npm run chat` loads a previous `outputs/<runId>/report.json`, chunks content into embedding-friendly segments, generates Gemini embeddings, and answers questions using semantic search over those chunks.
+
+Note: RAG uses a **local in-memory vector index** (Gemini embeddings + cosine similarity). No external database is required.
 
 ## Output
 

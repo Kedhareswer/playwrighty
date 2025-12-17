@@ -12,7 +12,19 @@ npm install
 
 ## Setup Gemini API Key
 
-For agentic mode and RAG chat, you need a Google API key:
+For agentic mode and RAG chat, you need a Google API key.
+
+Recommended: create a `.env` file in the project root:
+
+```bash
+GOOGLE_API_KEY=your_api_key_here
+
+# Optional
+GEMINI_MODEL=gemini-1.5-flash
+GEMINI_EMBEDDING_MODEL=text-embedding-004
+```
+
+Alternatively, you can set env vars in your shell:
 
 ```bash
 # Windows PowerShell
@@ -82,6 +94,10 @@ Content is extracted in formats optimized for LLM consumption:
 - Structured metadata (URL, title, headings)
 - Markdown reconstruction of main content
 - Tables converted to Markdown format
+
+## RAG Chat (how it works)
+
+Chat mode reads `report.json`, creates embeddings with Gemini, stores them in a **local in-memory vector index**, and uses similarity search to provide context for answering questions.
 
 ## Notes
 

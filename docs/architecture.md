@@ -6,7 +6,7 @@ Playwrighty is an agentic web scraper built with:
 - **LangGraph** — State machine for adaptive crawl decisions
 - **Gemini** — LLM for content analysis and RAG chat
 - **Playwright** — Browser automation with bot detection handling
-- **Vector Store** — In-memory embeddings for semantic search
+- **Vector Store** — Local in-memory embeddings + cosine similarity for semantic search
 
 ## High-level Flow
 
@@ -56,6 +56,14 @@ Playwrighty is an agentic web scraper built with:
 ### RAG
 - `src/rag/vectorStore.js` — In-memory vector store
 - `src/rag/chat.js` — RAG chat interface
+
+## Configuration
+
+Environment variables are loaded from `.env` at process start (`bin/cli.js`).
+
+- `GOOGLE_API_KEY`: required for Gemini chat + embeddings
+- `GEMINI_MODEL`: optional override for chat model
+- `GEMINI_EMBEDDING_MODEL`: optional override for embedding model
 
 ### Reports
 - `src/report/writeReport.js` — Markdown + JSON generation

@@ -13,6 +13,12 @@ Playwrighty fetches `robots.txt` from the site origin and uses it to decide whet
 - No form submissions
 - No authentication
 
+## Bot challenges (CAPTCHA / Cloudflare)
+
+If a website presents a bot challenge, Playwrighty supports a **headed** (visible browser) mode so you can complete the challenge manually and then continue crawling.
+
+This is intended for legitimate access to content you are allowed to view. Playwrighty does not attempt to bypass access controls.
+
 ## Intended use
 
 - Content discovery
