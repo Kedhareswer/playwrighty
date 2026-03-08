@@ -118,12 +118,31 @@ async function researchTopic(query, options = {}) {
   }
 
   // Step 4: Write audit trail to the output directory
+  audit.finalize();
   const auditJson = audit.toJSON();
   const auditMd = audit.toMarkdown();
 
   if (crawlResult?.outDir) {
-    fs.writeFileSync(path.join(crawlResult.outDir, 'audit-trail.json'), JSON.stringify(auditJson, null, 2), 'utf8');
-    fs.writeFileSync(path.join(crawlResult.outDir, 'audit-trail.md'), auditMd, 'utf8');
+    try {
+      const writes = [
+        fs.promises.writeFile(path.join(crawlResult.outDir, 'audit-trail.json'), JSON.stringify(auditJson, null, 2), 'utf8'),
+        fs.promises.writeFile(path.join(crawlResult.outDir, 'audit-trail.md'), auditMd, 'utf8'),
+      ];
+
+      // Update the audit index for O(1) lookup by sessionId
+      const outputsDir = path.dirname(crawlResult.outDir);
+      const indexPath = path.join(outputsDir, '.audit-index.json');
+      let index = {};
+      try {
+        index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+      } catch { /* no existing index */ }
+      index[audit.sessionId] = path.basename(crawlResult.outDir);
+      writes.push(fs.promises.writeFile(indexPath, JSON.stringify(index, null, 2), 'utf8'));
+
+      await Promise.all(writes);
+    } catch (err) {
+      progress('Audit', `Warning: failed to write audit trail: ${err.message}`);
+    }
   }
 
   progress('Done', 'Research complete');

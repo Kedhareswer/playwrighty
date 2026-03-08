@@ -61,11 +61,15 @@ class AuditTrail {
     return this._record(action, { input, output });
   }
 
+  finalize() {
+    this.completedAt = new Date().toISOString();
+  }
+
   toJSON() {
     return {
       sessionId: this.sessionId,
       startedAt: this.startedAt,
-      completedAt: new Date().toISOString(),
+      completedAt: this.completedAt || new Date().toISOString(),
       totalSteps: this.records.length,
       records: this.records,
     };
@@ -77,7 +81,7 @@ class AuditTrail {
     lines.push('');
     lines.push(`**Session ID:** ${this.sessionId}`);
     lines.push(`**Started:** ${this.startedAt}`);
-    lines.push(`**Completed:** ${new Date().toISOString()}`);
+    lines.push(`**Completed:** ${this.completedAt || new Date().toISOString()}`);
     lines.push(`**Total Steps:** ${this.records.length}`);
     lines.push('');
     lines.push('---');

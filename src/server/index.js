@@ -5,14 +5,17 @@ const { searchWeb } = require('../search/webSearch');
 const { crawlSite } = require('../crawler/crawlSite');
 const { researchTopic } = require('../pipelines/research');
 
+let pkgVersion = 'unknown';
+try { pkgVersion = require('../../package.json').version; } catch { /* fallback */ }
+
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 
 const PORT = process.env.PORT || 3000;
 
 // Health check
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'playwrighty', version: '0.2.0' });
+  res.json({ status: 'ok', service: 'playwrighty', version: pkgVersion });
 });
 
 /**
@@ -141,25 +144,21 @@ app.post('/api/research', async (req, res) => {
 app.get('/api/audit/:sessionId', (req, res) => {
   try {
     const outputsDir = path.resolve(process.cwd(), 'outputs');
-    if (!fs.existsSync(outputsDir)) {
-      return res.status(404).json({ error: 'No outputs directory found' });
+    const indexPath = path.join(outputsDir, '.audit-index.json');
+
+    if (!fs.existsSync(indexPath)) {
+      return res.status(404).json({ error: 'No audit index found' });
     }
 
-    // Search through output directories for matching audit trail
-    const dirs = fs.readdirSync(outputsDir).filter((d) => {
-      const auditPath = path.join(outputsDir, d, 'audit-trail.json');
-      return fs.existsSync(auditPath);
-    });
-
-    for (const dir of dirs) {
-      const auditPath = path.join(outputsDir, dir, 'audit-trail.json');
-      const audit = JSON.parse(fs.readFileSync(auditPath, 'utf8'));
-      if (audit.sessionId === req.params.sessionId) {
-        return res.json(audit);
-      }
+    const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    const dir = index[req.params.sessionId];
+    if (!dir) {
+      return res.status(404).json({ error: 'Audit trail not found for this session ID' });
     }
 
-    res.status(404).json({ error: 'Audit trail not found for this session ID' });
+    const auditPath = path.join(outputsDir, dir, 'audit-trail.json');
+    const audit = JSON.parse(fs.readFileSync(auditPath, 'utf8'));
+    return res.json(audit);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

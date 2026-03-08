@@ -15,12 +15,16 @@ async function searchWeb(query, options = {}) {
   const timestamp = new Date().toISOString();
 
   let rawResults;
-  if (type === 'news') {
-    const response = await DDG.searchNews(query, { safeSearch });
-    rawResults = (response.results || []).slice(0, maxResults);
-  } else {
-    const response = await DDG.search(query, { safeSearch });
-    rawResults = (response.results || []).slice(0, maxResults);
+  try {
+    if (type === 'news') {
+      const response = await DDG.searchNews(query, { safeSearch });
+      rawResults = (response.results || []).slice(0, maxResults);
+    } else {
+      const response = await DDG.search(query, { safeSearch });
+      rawResults = (response.results || []).slice(0, maxResults);
+    }
+  } catch (err) {
+    throw new Error(`DuckDuckGo search failed for query "${query}" (type=${type}): ${err.message}`);
   }
 
   const results = rawResults.map((r, index) => ({
