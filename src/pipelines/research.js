@@ -1,11 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const lockfile = require('proper-lockfile');
 const { searchWeb } = require('../search/webSearch');
 const { crawlSite } = require('../crawler/crawlSite');
 const { createVectorStore } = require('../rag/vectorStore');
 const { RAGChat } = require('../rag/chat');
 const { AuditTrail } = require('../audit/trail');
-const { nowStamp } = require('../report/util');
 
 /**
  * End-to-end research pipeline: search → scrape → index → synthesize.
@@ -76,7 +76,7 @@ async function researchTopic(query, options = {}) {
   }
 
   // Record each scraped page in the audit trail
-  const reportJson = JSON.parse(fs.readFileSync(crawlResult.reportJsonPath, 'utf8'));
+  const reportJson = JSON.parse(await fs.promises.readFile(crawlResult.reportJsonPath, 'utf8'));
   for (const page of reportJson.pages || []) {
     audit.recordScrape(page.url, page);
   }
@@ -124,22 +124,27 @@ async function researchTopic(query, options = {}) {
 
   if (crawlResult?.outDir) {
     try {
-      const writes = [
+      // Write audit trail files in parallel
+      await Promise.all([
         fs.promises.writeFile(path.join(crawlResult.outDir, 'audit-trail.json'), JSON.stringify(auditJson, null, 2), 'utf8'),
         fs.promises.writeFile(path.join(crawlResult.outDir, 'audit-trail.md'), auditMd, 'utf8'),
-      ];
+      ]);
 
-      // Update the audit index for O(1) lookup by sessionId
+      // Atomic read-modify-write of the audit index with file lock
       const outputsDir = path.dirname(crawlResult.outDir);
       const indexPath = path.join(outputsDir, '.audit-index.json');
-      let index = {};
+      // Ensure index file exists before locking
+      try { await fs.promises.access(indexPath); } catch { await fs.promises.writeFile(indexPath, '{}', 'utf8'); }
+      let release;
       try {
-        index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-      } catch { /* no existing index */ }
-      index[audit.sessionId] = path.basename(crawlResult.outDir);
-      writes.push(fs.promises.writeFile(indexPath, JSON.stringify(index, null, 2), 'utf8'));
-
-      await Promise.all(writes);
+        release = await lockfile.lock(indexPath, { retries: 3 });
+        let index = {};
+        try { index = JSON.parse(await fs.promises.readFile(indexPath, 'utf8')); } catch { /* fresh index */ }
+        index[audit.sessionId] = path.basename(crawlResult.outDir);
+        await fs.promises.writeFile(indexPath, JSON.stringify(index, null, 2), 'utf8');
+      } finally {
+        if (release) await release();
+      }
     } catch (err) {
       progress('Audit', `Warning: failed to write audit trail: ${err.message}`);
     }

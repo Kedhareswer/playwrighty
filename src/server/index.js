@@ -73,7 +73,7 @@ app.post('/api/scrape', async (req, res) => {
       headed: false,
     });
 
-    const reportJson = JSON.parse(fs.readFileSync(result.reportJsonPath, 'utf8'));
+    const reportJson = JSON.parse(await fs.promises.readFile(result.reportJsonPath, 'utf8'));
 
     res.json({
       pages: (reportJson.pages || []).map((p) => ({
@@ -108,6 +108,15 @@ app.post('/api/scrape', async (req, res) => {
  * Returns: { answer, sources, searchResults, auditTrailPath, reportPath }
  */
 app.post('/api/research', async (req, res) => {
+  // Research can take minutes (search + scrape + RAG). Set an explicit timeout.
+  // TODO: For production, replace with a job queue (e.g. Bull + Redis) and polling endpoint.
+  const RESEARCH_TIMEOUT_MS = 5 * 60 * 1000;
+  let timedOut = false;
+  res.setTimeout(RESEARCH_TIMEOUT_MS, () => {
+    timedOut = true;
+    res.status(504).json({ error: 'Research timed out. Consider using /api/search + /api/scrape separately for large queries.' });
+  });
+
   try {
     const { query, maxResults, maxPages, question } = req.body;
     if (!query) {
@@ -120,6 +129,7 @@ app.post('/api/research', async (req, res) => {
       question,
     });
 
+    if (timedOut) return;
     res.json({
       query: result.query,
       question: result.question,
@@ -141,24 +151,29 @@ app.post('/api/research', async (req, res) => {
  * GET /api/audit/:sessionId
  * Retrieve a previously saved audit trail by looking in outputs directories.
  */
-app.get('/api/audit/:sessionId', (req, res) => {
+app.get('/api/audit/:sessionId', async (req, res) => {
   try {
     const outputsDir = path.resolve(process.cwd(), 'outputs');
     const indexPath = path.join(outputsDir, '.audit-index.json');
 
-    if (!fs.existsSync(indexPath)) {
+    let indexData;
+    try {
+      indexData = await fs.promises.readFile(indexPath, 'utf8');
+    } catch {
       return res.status(404).json({ error: 'No audit index found' });
     }
 
-    const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    const index = JSON.parse(indexData);
     const dir = index[req.params.sessionId];
-    if (!dir) {
+
+    // Validate dir to prevent path traversal (e.g. "../../etc")
+    if (!dir || dir !== path.basename(dir)) {
       return res.status(404).json({ error: 'Audit trail not found for this session ID' });
     }
 
     const auditPath = path.join(outputsDir, dir, 'audit-trail.json');
-    const audit = JSON.parse(fs.readFileSync(auditPath, 'utf8'));
-    return res.json(audit);
+    const auditData = await fs.promises.readFile(auditPath, 'utf8');
+    return res.json(JSON.parse(auditData));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
