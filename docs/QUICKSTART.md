@@ -60,6 +60,26 @@ npm run chat
 
 Ask questions about previously scraped content. Select a crawl run and start chatting!
 
+### 3. API Server Mode
+
+```bash
+npm run serve
+```
+
+Starts a REST API server (default port 3000, configurable via `PORT` env var) for programmatic integration with diligence tools.
+
+```bash
+# Search DuckDuckGo for URLs
+curl -X POST http://localhost:3000/api/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "renewable energy policies"}'
+
+# Full research pipeline (search + scrape + RAG synthesis)
+curl -X POST http://localhost:3000/api/research \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "renewable energy policies", "question": "What are the key trends?"}'
+```
+
 ## Output
 
 ```
@@ -101,6 +121,7 @@ Chat mode reads `report.json`, creates embeddings with Gemini, stores them in a 
 
 ## Notes
 
-- **Same-origin only** — won't follow external domains
-- **Respects robots.txt** — ethical crawling
+- **Same-origin by default** — site-wide crawls stay on the same origin. Cross-origin is supported when URLs are explicitly provided (`scope: 'provided'`)
+- **Respects robots.txt** — ethical crawling for site-wide mode. Skipped for explicitly provided URLs since the caller chose them intentionally
 - **Atomic outputs** — failed runs don't leave empty folders
+- **Audit trail** — research pipeline runs produce `audit-trail.json` and `audit-trail.md` in the output directory for full traceability

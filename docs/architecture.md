@@ -16,17 +16,23 @@ Playwrighty is an agentic web scraper built with:
 │  (prompts)  │     │   Agent     │     │   Backend   │
 └─────────────┘     └─────────────┘     └─────────────┘
                            │                    │
-                           ▼                    ▼
-                    ┌─────────────┐     ┌─────────────┐
-                    │   Gemini    │     │  Extraction │
-                    │   (LLM)     │     │  + Reports  │
-                    └─────────────┘     └─────────────┘
-                                               │
-                                               ▼
-                                        ┌─────────────┐
-                                        │  RAG Chat   │
-                                        │  (Vector)   │
+┌─────────────┐            ▼                    ▼
+│  REST API   │     ┌─────────────┐     ┌─────────────┐
+│  Server     │ ──▶ │   Gemini    │     │  Extraction │
+└─────────────┘     │   (LLM)     │     │  + Reports  │
+       │            └─────────────┘     └─────────────┘
+       ▼                                       │
+┌─────────────┐                                ▼
+│  DuckDuckGo │                         ┌─────────────┐
+│  Search     │                         │  RAG Chat   │
+└─────────────┘                         │  (Vector)   │
                                         └─────────────┘
+```
+
+### Research Pipeline Flow
+
+```
+Search (DDG) → Scrape (Playwright) → Index (Vectors) → Synthesize (Gemini) → Audit Trail
 ```
 
 ## Key Modules
@@ -34,12 +40,12 @@ Playwrighty is an agentic web scraper built with:
 ### Core
 - `bin/cli.js` — Entry point
 - `src/cli/run.js` — Interactive CLI with crawl + chat modes
-- `src/index.js` — Public API exports
+- `src/index.js` — Public API exports (`crawlSite`, `searchWeb`, `researchTopic`, `AuditTrail`)
+- `src/core/url.js` — URL utilities + `isPrivateUrl()` SSRF protection
 
 ### Crawler
-- `src/crawler/crawlSite.js` — Standard crawl orchestration
+- `src/crawler/crawlSite.js` — Standard crawl orchestration (supports AbortController signals)
 - `src/crawler/discovery.js` — robots.txt + sitemap discovery
-- `src/core/url.js` — URL utilities
 
 ### Agent (LangGraph)
 - `src/agent/state.js` — Agent state schema (Annotation)
@@ -57,6 +63,18 @@ Playwrighty is an agentic web scraper built with:
 - `src/rag/vectorStore.js` — In-memory vector store
 - `src/rag/chat.js` — RAG chat interface
 
+### Search
+- `src/search/webSearch.js` — DuckDuckGo web search (free, no API key)
+
+### Pipeline
+- `src/pipelines/research.js` — End-to-end research: search → scrape → index → synthesize
+
+### Audit
+- `src/audit/trail.js` — Session-scoped audit trail (JSON + Markdown)
+
+### Server
+- `src/server/index.js` — Express REST API (search, scrape, research, audit endpoints)
+
 ## Configuration
 
 Environment variables are loaded from `.env` at process start (`bin/cli.js`).
@@ -64,6 +82,7 @@ Environment variables are loaded from `.env` at process start (`bin/cli.js`).
 - `GOOGLE_API_KEY`: required for Gemini chat + embeddings
 - `GEMINI_MODEL`: optional override for chat model
 - `GEMINI_EMBEDDING_MODEL`: optional override for embedding model
+- `PORT`: REST API server port (default 3000)
 
 ### Reports
 - `src/report/writeReport.js` — Markdown + JSON generation

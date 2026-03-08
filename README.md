@@ -11,6 +11,10 @@
 - **⚡ Parallel crawling** — Configurable concurrency
 - **📊 LLM-friendly extraction** — Chunked content with metadata for embeddings
 - **📝 Professional reports** — Markdown + JSON with structured content
+- **🌐 REST API server** — HTTP endpoints for diligence tool integration
+- **🔍 DuckDuckGo web search** — Free URL discovery, no API key needed
+- **🔬 Research pipeline** — End-to-end search → scrape → RAG synthesis
+- **📜 Audit trail** — Full traceability for every step (JSON + Markdown)
 
 ## Quick Start
 
@@ -18,6 +22,7 @@
 npm install
 npm start        # Interactive crawl mode
 npm run chat     # RAG chat on scraped content
+npm run serve    # REST API server
 ```
 
 ## Environment Variables
@@ -30,6 +35,9 @@ GOOGLE_API_KEY=your_gemini_api_key
 # Optional: override models
 GEMINI_MODEL=gemini-1.5-flash
 GEMINI_EMBEDDING_MODEL=text-embedding-004
+
+# Optional: API server port (default 3000)
+PORT=3000
 ```
 
 Get your API key at: https://makersuite.google.com/app/apikey
@@ -56,11 +64,39 @@ Get your API key at: https://makersuite.google.com/app/apikey
 
 Note: RAG uses a **local in-memory vector index** (Gemini embeddings + cosine similarity). No external database is required.
 
+## REST API
+
+Start the server with `npm run serve` (default port 3000, configurable via `PORT`).
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/search` | POST | Search DuckDuckGo for URLs (no scraping) |
+| `/api/scrape` | POST | Deep-scrape given URLs with Playwright |
+| `/api/research` | POST | End-to-end: search → scrape → RAG synthesis |
+| `/api/audit/:sessionId` | GET | Retrieve a saved audit trail |
+
+Example:
+
+```bash
+# Search for URLs
+curl -X POST http://localhost:3000/api/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "climate change mitigation strategies"}'
+
+# Full research pipeline
+curl -X POST http://localhost:3000/api/research \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "climate change mitigation", "question": "What are the top 3 strategies?"}'
+```
+
 ## Output
 
 ```
 ./outputs/<timestamp>_<hostname>/
-├── report.md        # Human-readable report
-├── report.json      # Machine-readable data (for RAG)
-└── screenshots/     # Page screenshots (optional)
+├── report.md          # Human-readable report
+├── report.json        # Machine-readable data (for RAG)
+├── audit-trail.json   # Full audit trail (research pipeline)
+├── audit-trail.md     # Human-readable audit trail
+└── screenshots/       # Page screenshots (optional)
 ```
