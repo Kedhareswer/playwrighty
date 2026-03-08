@@ -8,7 +8,11 @@ const { RAGChat } = require('../rag/chat');
 const { AuditTrail } = require('../audit/trail');
 
 function checkAborted(signal) {
-  if (signal?.aborted) throw new Error('Research aborted');
+  if (signal?.aborted) {
+    const err = new Error('Research aborted');
+    err.name = 'AbortError';
+    throw err;
+  }
 }
 
 /**
