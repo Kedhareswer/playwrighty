@@ -4,7 +4,7 @@ const pLimitPkg = require('p-limit');
 const pLimit = pLimitPkg?.default || pLimitPkg;
 
 const { discoverSitemapUrls, getRobotsPolicy } = require('./discovery');
-const { sameOrigin, normalizeUrl } = require('../core/url');
+const { sameOrigin, normalizeUrl, isPrivateUrl } = require('../core/url');
 const { createPlaywrightBackend } = require('../runners/playwrightBackend');
 const { writeReport } = require('../report/writeReport');
 const { safeFilename, nowStamp } = require('../report/util');
@@ -26,6 +26,7 @@ async function crawlSite({
   concurrency,
   screenshots,
   headed,
+  signal,
   onProgress,
 }) {
   const startedAt = new Date();
@@ -59,12 +60,12 @@ async function crawlSite({
   const enqueue = (u, source) => {
     if (!isHttpUrl(u)) return;
     const nu = normalizeUrl(u);
-    if (!sameOrigin(nu, startUrl)) return;
+    if (scope !== 'provided' && !sameOrigin(nu, startUrl)) return;
     if (queued.has(nu)) return;
     if (canonicalByRequested.has(nu)) return;
     if (pages.size + queue.length >= maxPages) return;
 
-    if (!robots.canFetch(nu)) return;
+    if (scope !== 'provided' && !robots.canFetch(nu)) return;
 
     queued.add(nu);
     queue.push({ url: nu, source });
@@ -98,6 +99,7 @@ async function crawlSite({
 
   const worker = async () => {
     while (queue.length && pages.size < maxPages) {
+      if (signal?.aborted) break;
       const item = queue.shift();
       if (!item) break;
       const url = item.url;
@@ -114,6 +116,13 @@ async function crawlSite({
       });
 
       const canonicalUrl = normalizeUrl(pageResult.finalUrl || url);
+
+      // SSRF: reject if a redirect landed on a private/internal address
+      if (isPrivateUrl(canonicalUrl)) {
+        progress('Crawl', `Skipping redirect to private URL: ${canonicalUrl}`);
+        continue;
+      }
+
       canonicalByRequested.set(url, canonicalUrl);
       if (canonicalUrl !== url) {
         canonicalByRequested.set(canonicalUrl, canonicalUrl);

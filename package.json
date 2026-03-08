@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node bin/cli.js",
     "chat": "node bin/cli.js chat",
+    "serve": "node src/server/index.js",
     "lint": "node -c bin/cli.js && node -c src/index.js"
   },
   "dependencies": {
@@ -17,10 +18,13 @@
     "@langchain/langgraph": "^0.2.0",
     "chalk": "^4.1.2",
     "dotenv": "^16.4.5",
+    "duck-duck-scrape": "^2.2.7",
+    "express": "^4.21.0",
     "inquirer": "^8.2.6",
     "ora": "^6.3.1",
     "p-limit": "^3.1.0",
     "playwright": "^1.49.1",
+    "proper-lockfile": "^4.1.2",
     "robots-parser": "^3.0.1",
     "sitemapper": "^3.2.4",
     "uuid": "^9.0.0"
