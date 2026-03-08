@@ -111,10 +111,17 @@ app.post('/api/research', async (req, res) => {
   // Research can take minutes (search + scrape + RAG). Set an explicit timeout.
   // TODO: For production, replace with a job queue (e.g. Bull + Redis) and polling endpoint.
   const RESEARCH_TIMEOUT_MS = 5 * 60 * 1000;
-  let timedOut = false;
+  const controller = new AbortController();
+
   res.setTimeout(RESEARCH_TIMEOUT_MS, () => {
-    timedOut = true;
-    res.status(504).json({ error: 'Research timed out. Consider using /api/search + /api/scrape separately for large queries.' });
+    controller.abort();
+    if (!res.headersSent) {
+      res.status(504).json({ error: 'Research timed out. Consider using /api/search + /api/scrape separately for large queries.' });
+    }
+  });
+
+  req.on('close', () => {
+    if (!res.writableFinished) controller.abort();
   });
 
   try {
@@ -127,9 +134,10 @@ app.post('/api/research', async (req, res) => {
       maxResults,
       maxPages,
       question,
+      signal: controller.signal,
     });
 
-    if (timedOut) return;
+    if (res.headersSent) return;
     res.json({
       query: result.query,
       question: result.question,
@@ -143,6 +151,7 @@ app.post('/api/research', async (req, res) => {
       error: result.error || null,
     });
   } catch (err) {
+    if (res.headersSent) return;
     res.status(500).json({ error: err.message });
   }
 });

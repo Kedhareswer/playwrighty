@@ -7,6 +7,10 @@ const { createVectorStore } = require('../rag/vectorStore');
 const { RAGChat } = require('../rag/chat');
 const { AuditTrail } = require('../audit/trail');
 
+function checkAborted(signal) {
+  if (signal?.aborted) throw new Error('Research aborted');
+}
+
 /**
  * End-to-end research pipeline: search → scrape → index → synthesize.
  *
@@ -21,6 +25,7 @@ async function researchTopic(query, options = {}) {
     headed = false,
     question = null,
     onProgress = null,
+    signal = null,
   } = options;
 
   const audit = new AuditTrail();
@@ -29,6 +34,7 @@ async function researchTopic(query, options = {}) {
   };
 
   // Step 1: Search DuckDuckGo for relevant URLs
+  checkAborted(signal);
   progress('Search', `Searching DuckDuckGo for: ${query}`);
   const searchResult = await searchWeb(query, { maxResults });
   audit.recordSearch(query, searchResult.results);
@@ -47,6 +53,7 @@ async function researchTopic(query, options = {}) {
   progress('Search', `Found ${searchResult.results.length} results`);
 
   // Step 2: Scrape the discovered URLs using Playwrighty
+  checkAborted(signal);
   const urlsToScrape = searchResult.results.map((r) => r.url);
   progress('Scrape', `Scraping ${urlsToScrape.length} URLs...`);
 
@@ -60,6 +67,7 @@ async function researchTopic(query, options = {}) {
       concurrency,
       screenshots,
       headed,
+      signal,
       onProgress: (event) => {
         progress(event.phase, event.message);
       },
@@ -90,6 +98,10 @@ async function researchTopic(query, options = {}) {
   const userQuestion = question || query;
 
   try {
+    checkAborted(signal);
+
+    // Lazy require: Gemini LLM is optional (requires GOOGLE_API_KEY).
+    // If unavailable, the catch block below skips synthesis gracefully.
     const { createGeminiChat, createGeminiEmbeddings } = require('../llm/gemini');
     const embeddings = createGeminiEmbeddings();
     const llm = createGeminiChat({ temperature: 0.3 });
@@ -100,6 +112,7 @@ async function researchTopic(query, options = {}) {
       await vectorStore.addPages(reportJson.pages);
     }
 
+    checkAborted(signal);
     progress('Analyze', `Synthesizing answer for: ${userQuestion}`);
     const ragChat = new RAGChat({ llm, vectorStore, report: reportJson });
     const chatResult = await ragChat.chat(userQuestion);

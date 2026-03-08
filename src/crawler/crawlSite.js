@@ -26,6 +26,7 @@ async function crawlSite({
   concurrency,
   screenshots,
   headed,
+  signal,
   onProgress,
 }) {
   const startedAt = new Date();
@@ -98,6 +99,7 @@ async function crawlSite({
 
   const worker = async () => {
     while (queue.length && pages.size < maxPages) {
+      if (signal?.aborted) break;
       const item = queue.shift();
       if (!item) break;
       const url = item.url;
