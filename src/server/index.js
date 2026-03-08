@@ -4,6 +4,7 @@ const path = require('path');
 const { searchWeb } = require('../search/webSearch');
 const { crawlSite } = require('../crawler/crawlSite');
 const { researchTopic } = require('../pipelines/research');
+const { isPrivateUrl } = require('../core/url');
 
 let pkgVersion = 'unknown';
 try { pkgVersion = require('../../package.json').version; } catch { /* fallback */ }
@@ -57,10 +58,33 @@ app.post('/api/search', async (req, res) => {
  * Returns: { pages, reportPath, audit }
  */
 app.post('/api/scrape', async (req, res) => {
+  const SCRAPE_TIMEOUT_MS = 3 * 60 * 1000;
+  const controller = new AbortController();
+
+  res.setTimeout(SCRAPE_TIMEOUT_MS, () => {
+    controller.abort();
+    if (!res.headersSent) {
+      res.status(504).json({ error: 'Scrape timed out' });
+    }
+  });
+
+  req.on('close', () => {
+    if (!res.writableFinished) controller.abort();
+  });
+
   try {
     const { urls, screenshots = false, maxConcurrency = 3 } = req.body;
     if (!urls || !Array.isArray(urls) || !urls.length) {
       return res.status(400).json({ error: 'urls array is required' });
+    }
+
+    // SSRF protection: reject URLs targeting private/internal networks
+    const privateUrls = urls.filter((u) => isPrivateUrl(u));
+    if (privateUrls.length) {
+      return res.status(400).json({
+        error: 'URLs targeting private/internal networks are not allowed',
+        rejectedUrls: privateUrls,
+      });
     }
 
     const result = await crawlSite({
@@ -71,8 +95,10 @@ app.post('/api/scrape', async (req, res) => {
       concurrency: maxConcurrency,
       screenshots,
       headed: false,
+      signal: controller.signal,
     });
 
+    if (res.headersSent) return;
     const reportJson = JSON.parse(await fs.promises.readFile(result.reportJsonPath, 'utf8'));
 
     res.json({
@@ -96,6 +122,7 @@ app.post('/api/scrape', async (req, res) => {
       },
     });
   } catch (err) {
+    if (res.headersSent) return;
     res.status(500).json({ error: err.message });
   }
 });

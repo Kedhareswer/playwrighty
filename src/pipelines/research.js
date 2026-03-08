@@ -73,6 +73,7 @@ async function researchTopic(query, options = {}) {
       },
     });
   } catch (err) {
+    if (signal?.aborted) throw err;
     return {
       query,
       answer: null,
@@ -126,6 +127,7 @@ async function researchTopic(query, options = {}) {
       { answer, sources }
     );
   } catch (err) {
+    if (signal?.aborted) throw err;
     audit.recordStep('analysis_error', { question: userQuestion }, { error: err.message });
     progress('Analyze', `LLM synthesis skipped: ${err.message}`);
   }

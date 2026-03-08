@@ -60,7 +60,7 @@ async function crawlSite({
   const enqueue = (u, source) => {
     if (!isHttpUrl(u)) return;
     const nu = normalizeUrl(u);
-    if (!sameOrigin(nu, startUrl)) return;
+    if (scope !== 'provided' && !sameOrigin(nu, startUrl)) return;
     if (queued.has(nu)) return;
     if (canonicalByRequested.has(nu)) return;
     if (pages.size + queue.length >= maxPages) return;
